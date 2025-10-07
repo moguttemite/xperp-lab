@@ -1,0 +1,56 @@
+# 跨所·跨时间 永续合约复合策略参数模板
+# Cross-exchange perpetual strategy parameter template
+#
+# 包含以下配置：
+# - 入场门槛（趋势强度、最小目标收益、资金费差等）
+# - 锁盈/解锁参数（触发涨幅、价差带、最大持有时间等）
+# - 风控参数（止损、净Delta上限、资金费保护等）
+# - 费率配置（手续费、返佣等）
+# - 交易所配置（Lighter、GRVT 接口配置）
+#
+# 使用方法：
+# python src/main.py --config configs/example.yml
+symbol: BTCUSDT
+leverage: 10
+base_qty: 0.01 # 名义第一腿仓位
+
+
+# 入场门槛（>= 2 条满足）
+thresholds:
+trend_strength: {ema_fast: 21, ema_slow: 55, min_diff: 0.0008} # θ1
+min_target_return: 0.0035 # θ2（含费后）
+funding_spread_bps: 1.0 # θ3（单位：bp）
+vol_band: {vmin: 0.25, vmax: 2.5} # 实现波动过滤
+
+
+# 锁盈/解锁参数
+locking:
+g_pct: 0.005 # P_lock 触发涨幅 g%
+band_sigma: 0.8 # LB/UB 以 σ 计算（或用分位见下）
+quantile_band: {lb: 0.2, ub: 0.8}
+t_max_sec: 14400 # 对锁最长持有（4h）
+epsilon_bp: 2.0 # 二腿分批带宽 ε（bp）
+
+
+risk:
+stop_loss_first_leg: 0.01 # SL_1（1%）
+net_delta_max_ratio: 0.10 # |净敞口| ≤ 10% 名义
+isolated_margin: true # 隔离保证金
+funding_guard_apr: 0.30 # 净资金费年化超过即切腿/降仓
+
+
+fees:
+taker_bps: 2.0
+maker_rebate_bps: -0.5
+referral_rebate_bps: -0.2
+
+
+exchanges:
+lighter:
+name: lighter
+endpoint: https://api.lighter.xyz
+account: default
+grvt:
+name: grvt
+endpoint: https://api.grvt.io
+account: default
