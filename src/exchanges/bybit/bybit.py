@@ -14,11 +14,13 @@ bybit.py — Bybit 永续合约适配器（实现 BaseExchange 抽象接口）
 
 from __future__ import annotations
 
+import os
 import time
 import hmac
 import hashlib
 import logging
 import threading
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Literal
 from urllib.parse import urlencode
@@ -48,31 +50,25 @@ REVERSE_ALIASES: Dict[str, str] = {v: k for k, v in SYMBOL_ALIASES.items()}
 
 
 # ================== 配置 ==================
+from dotenv import load_dotenv
+# 获取当前目录
+current_dir = Path(__file__).parent
+dotenv_path = current_dir / '.env'
+load_dotenv(dotenv_path=dotenv_path, override=False, verbose=True)
 
 @dataclass
 class BybitConfig:
     """Bybit 交易所配置"""
     # API 凭证
-    api_key: str
-    api_secret: str
-    
+    api_key: os.getenv("BYBIT_API_KEY")
+    api_secret: os.getenv("BYBIT_API_SECRET")
+    testnet_url: str = os.getenv("BYBIT_TESTNET_URL")
+    mainnet_url: str = os.getenv("BYBIT_MAINNET_URL")
+
     # 网络配置
-    base_url: str = "https://api.bybit.com"
     testnet: bool = False  # True 则使用测试网
+    base_url: str = testnet_url if testnet else mainnet_url
     
-    # 请求配置
-    timeout_sec: int = 10
-    recv_window_ms: int = 5000
-    user_agent: str = "bybit-exchange-adapter/1.0"
-    max_retries: int = 3
-    retry_backoff_sec: float = 0.5
-    
-    def __post_init__(self):
-        """初始化后处理"""
-        if self.testnet:
-            self.base_url = "https://api-testnet.bybit.com"
-
-
 # ================== 实现类 ==================
 
 class BybitExchange(BaseExchange):
@@ -80,31 +76,21 @@ class BybitExchange(BaseExchange):
     
     def __init__(
         self,
-        api_key: str,
-        api_secret: str,
-        *,
-        testnet: bool = False,
-        base_url: Optional[str] = None,
+        testnet: bool = True,
         session: Optional["requests.Session"] = None
     ) -> None:
         """
         初始化 Bybit 交易所连接
         
         Args:
-            api_key: API Key
-            api_secret: API Secret
             testnet: 是否使用测试网
-            base_url: 自定义 API 地址（可选）
             session: 自定义 requests.Session（可选）
         """
         if requests is None:
             raise RuntimeError("requests library not installed")
         
         self.cfg = BybitConfig(
-            api_key=api_key,
-            api_secret=api_secret,
             testnet=testnet,
-            base_url=base_url or ("https://api-testnet.bybit.com" if testnet else "https://api.bybit.com")
         )
         
         self._http = session or requests.Session()
@@ -123,6 +109,7 @@ class BybitExchange(BaseExchange):
     
     def _map_symbol_out(self, symbol: str) -> str:
         """内部标准符号 -> Bybit 符号"""
+        # 若 symbol 不在映射表中，则返回原 symbol（支持空/部分映射，避免 None）
         return self._symbol_map.get(symbol, symbol)
     
     def _map_symbol_in(self, symbol: str) -> str:
@@ -772,31 +759,4 @@ class BybitExchange(BaseExchange):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    
-    # 初始化交易所
-    exchange = BybitExchange(
-        api_key="YOUR_API_KEY",
-        api_secret="YOUR_API_SECRET",
-        testnet=True  # 使用测试网
-    )
-    
-    # 获取行情
-    ticker = exchange.get_ticker("BTCUSDT")
-    print(f"BTC Price: {ticker['last']}")
-    
-    # 获取持仓
-    positions = exchange.get_positions()
-    print(f"Positions: {positions}")
-    
-    # 下单示例
-    from base_exchange import OrderParams
-    
-    order = exchange.place_order(OrderParams(
-        symbol="BTCUSDT",
-        side="buy",
-        qty=0.001,
-        order_type="limit",
-        price=30000.0,
-        tif="gtc"
-    ))
-    print(f"Order: {order}")
+    pass
