@@ -54,3 +54,26 @@ grvt:
 name: grvt
 endpoint: https://api.grvt.io
 account: default
+
+# Sentinel 实时市场状况分析配置
+sentinel:
+  enabled: true
+  cooldown_sec: 300                 # 告警冷却，避免抖动
+  score_thresholds: { tighten: 60, pause: 80 }  # 分数阈值：收紧/暂停
+  weights:                          # 各检测器权重
+    vol_spike: 1.0
+    spread_blowout: 1.2
+    ob_imbalance: 0.6
+    funding_shock: 0.8
+    whale_onchain: 1.5
+    news: 2.0
+  detectors:
+    vol_spike:     { win: 120, z: 4.0, vol_z: 2.0 }      # N根内收益z>4且量z>2
+    spread_blowout:{ win: 60,  z: 3.5 }                   # 跨所价差z>3.5
+    ob_imbalance:  { depth: 10, thresh: 0.65, min_notional: 100000 }
+    funding_shock: { win: 24,  delta_bps: 3.0 }
+    whale_onchain: { min_btc: 1000, cooldown_sec: 3600 }  # 占位：>=1000 BTC 大额转移
+    news:         { keywords: ["war","hack","sanction","exploit"], severity_map: {} }
+  outputs:
+    log: true
+    webhook: ""      # 可留空，后续接Slack/Discord/自研告警
